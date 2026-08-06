@@ -5,6 +5,11 @@ import json
 import os
 import sys
 import winreg
+import socket
+
+# Pystray para a bandeja do sistema
+import pystray
+from PIL import Image, ImageDraw
 
 # Importa as funções que criamos em server.py e client.py
 from server import run_server
@@ -24,28 +29,58 @@ def get_config_path():
     """O config.json será salvo na mesma pasta do executável."""
     return os.path.join(os.path.dirname(get_script_path()), CONFIG_FILE)
 
+def get_local_ip():
+    """Tenta descobrir o IP local da máquina"""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+def create_tray_icon_image():
+    """Gera um ícone simples para a bandeja do sistema (se não houver um .ico)"""
+    image = Image.new('RGB', (64, 64), color=(30, 30, 30))
+    d = ImageDraw.Draw(image)
+    # Desenha um quadrado verde no meio
+    d.rectangle([16, 16, 48, 48], fill=(0, 200, 0))
+    return image
+
 class AudioSyncApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Audio Sync Launcher")
-        self.root.geometry("400x320")
+        self.root.geometry("400x380")
         self.root.resizable(False, False)
         
         # Configurações padrão
-        self.config = {"mode": "server", "ip": "192.168.0.10", "autostart": False}
+        self.config = {
+            "mode": "server", 
+            "ip": "", 
+            "autostart": False,
+            "autosync": False
+        }
         self.load_config()
         
         self.worker_thread = None
         self.stop_event = threading.Event()
         self.is_running = False
+        self.tray_icon = None
 
         self.setup_ui()
+        self.setup_tray()
+        
+        # Intercepta o botão de fechar (X)
+        self.root.protocol("WM_DELETE_WINDOW", self.hide_window)
         
         # Verifica se o programa foi iniciado automaticamente pelo Windows
         if "--autostart" in sys.argv:
-            # Esconde a janela se quiser uma execução invisível, ou apenas inicia minimizada
-            # self.root.iconify() 
-            self.start_sync()
+            # Esconde a janela
+            self.root.withdraw()
+            if self.config.get("autosync", False):
+                self.start_sync()
             
     def load_config(self):
         try:
@@ -63,18 +98,19 @@ class AudioSyncApp:
             print(f"Erro ao salvar config: {e}")
             
     def toggle_autostart(self):
-        """Ativado quando o usuário clica na checkbox de Autostart"""
         self.config["autostart"] = self.autostart_var.get()
         self.save_config()
         self.apply_autostart(self.config["autostart"])
+        
+    def toggle_autosync(self):
+        self.config["autosync"] = self.autosync_var.get()
+        self.save_config()
 
     def apply_autostart(self, enable):
-        """Adiciona ou remove o atalho no Registro do Windows (Run)"""
         key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
         try:
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_ALL_ACCESS)
             if enable:
-                # O comando adiciona o --autostart para que saibamos que foi o Windows que iniciou
                 cmd = f'"{get_script_path()}" --autostart'
                 winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, cmd)
             else:
@@ -89,9 +125,14 @@ class AudioSyncApp:
     def setup_ui(self):
         self.mode_var = tk.StringVar(value=self.config["mode"])
         
+        # Exibe IP Local
+        self.local_ip = get_local_ip()
+        tk.Label(self.root, text=f"IP DESTE COMPUTADOR: {self.local_ip}", 
+                 fg="darkred", font=("Arial", 11, "bold")).pack(pady=10)
+
         # Seção do Modo de Operação
         frame_mode = tk.LabelFrame(self.root, text="Modo de Operação", padx=10, pady=10)
-        frame_mode.pack(fill="x", padx=10, pady=10)
+        frame_mode.pack(fill="x", padx=10, pady=5)
         
         tk.Radiobutton(frame_mode, text="Servidor (PC Desktop - Recebe Áudio)", 
                        variable=self.mode_var, value="server", 
@@ -100,26 +141,32 @@ class AudioSyncApp:
                        variable=self.mode_var, value="client", 
                        command=self.on_mode_change).pack(anchor="w")
         
-        # Seção de Configuração do Cliente
+        # Seção de Configuração do Outro IP
         self.frame_ip = tk.Frame(self.root)
-        tk.Label(self.frame_ip, text="IP do Servidor (PC):").pack(side="left")
+        self.ip_label = tk.Label(self.frame_ip, text="IP do Cliente (Notebook):")
+        self.ip_label.pack(side="left")
         self.ip_entry = tk.Entry(self.frame_ip, width=15)
         self.ip_entry.insert(0, self.config["ip"])
         self.ip_entry.pack(side="left", padx=5)
         self.frame_ip.pack(fill="x", padx=15, pady=5)
         
-        # Atualiza visibilidade da aba do Cliente
+        # Atualiza o texto da label do IP
         self.on_mode_change()
         
-        # Autostart
+        # Autostart e AutoSync
         self.autostart_var = tk.BooleanVar(value=self.config.get("autostart", False))
-        tk.Checkbutton(self.root, text="Iniciar automaticamente com o Windows", 
+        tk.Checkbutton(self.root, text="Iniciar automaticamente com o Windows (Oculto)", 
                        variable=self.autostart_var, 
-                       command=self.toggle_autostart).pack(anchor="w", padx=15, pady=5)
+                       command=self.toggle_autostart).pack(anchor="w", padx=15, pady=2)
+                       
+        self.autosync_var = tk.BooleanVar(value=self.config.get("autosync", False))
+        tk.Checkbutton(self.root, text="Iniciar Sincronização Automaticamente ao abrir", 
+                       variable=self.autosync_var, 
+                       command=self.toggle_autosync).pack(anchor="w", padx=15, pady=2)
 
         # Labels de Status
         self.status_var = tk.StringVar(value="Status: Parado")
-        tk.Label(self.root, textvariable=self.status_var, fg="blue", font=("Arial", 9, "bold")).pack(pady=10)
+        tk.Label(self.root, textvariable=self.status_var, fg="blue", font=("Arial", 9, "bold")).pack(pady=5)
 
         # Botões Iniciar e Parar
         frame_btns = tk.Frame(self.root)
@@ -132,14 +179,13 @@ class AudioSyncApp:
         self.btn_stop.pack(side="left", padx=10)
 
     def on_mode_change(self):
-        """Esconde ou mostra o campo de IP dependendo do modo"""
-        if self.mode_var.get() == "client":
-            self.frame_ip.pack(fill="x", padx=15, pady=5)
+        """Muda o texto do campo de IP dependendo do modo"""
+        if self.mode_var.get() == "server":
+            self.ip_label.config(text="IP do Cliente (Notebook):")
         else:
-            self.frame_ip.pack_forget()
+            self.ip_label.config(text="IP do Servidor (PC):")
 
     def set_status(self, text):
-        """Atualiza o texto de status de forma segura na thread principal"""
         self.root.after(0, lambda: self.status_var.set(f"Status: {text}"))
 
     def start_sync(self):
@@ -148,20 +194,19 @@ class AudioSyncApp:
         mode = self.mode_var.get()
         ip = self.ip_entry.get().strip()
         
-        # Salva o config antes de iniciar
+        if not ip:
+            messagebox.showerror("Erro", "Por favor, insira o IP do outro computador.")
+            return
+
         self.config["mode"] = mode
         self.config["ip"] = ip
         self.save_config()
         
         self.stop_event.clear()
         
-        # Inicia o Servidor ou o Cliente em uma Thread separada (para não travar a GUI)
         if mode == "server":
-            self.worker_thread = threading.Thread(target=run_server, args=(self.stop_event, self.set_status), daemon=True)
+            self.worker_thread = threading.Thread(target=run_server, args=(ip, self.stop_event, self.set_status), daemon=True)
         else:
-            if not ip:
-                messagebox.showerror("Erro", "Por favor, insira o IP do Servidor.")
-                return
             self.worker_thread = threading.Thread(target=run_client, args=(ip, self.stop_event, self.set_status), daemon=True)
             
         self.worker_thread.start()
@@ -181,13 +226,35 @@ class AudioSyncApp:
         self.btn_stop.config(state="disabled")
         self.ip_entry.config(state="normal")
 
-    def on_closing(self):
-        """Garante que a porta UDP/Threads sejam fechadas ao sair da janela"""
+    # ==========================
+    # Lógica do System Tray
+    # ==========================
+    def setup_tray(self):
+        menu = pystray.Menu(
+            pystray.MenuItem('Abrir AudioSync', self.show_window),
+            pystray.MenuItem('Sair Completamente', self.quit_app)
+        )
+        self.tray_icon = pystray.Icon("AudioSync", create_tray_icon_image(), "AudioSync", menu)
+        # Roda o ícone em uma thread separada para não travar o tkinter
+        threading.Thread(target=self.tray_icon.run, daemon=True).start()
+
+    def hide_window(self):
+        """Ao clicar no X, apenas esconde a janela."""
+        self.root.withdraw()
+        
+    def show_window(self, icon=None, item=None):
+        """Restaura a janela do modo oculto."""
+        # after() garante que a chamada ocorra na main thread do tkinter
+        self.root.after(0, self.root.deiconify)
+        
+    def quit_app(self, icon=None, item=None):
+        """Fecha a aplicação de verdade."""
         self.stop_event.set()
-        self.root.destroy()
+        if self.tray_icon:
+            self.tray_icon.stop()
+        self.root.quit()
 
 if __name__ == "__main__":
     root = tk.Tk()
     app = AudioSyncApp(root)
-    root.protocol("WM_DELETE_WINDOW", app.on_closing)
     root.mainloop()

@@ -5,10 +5,11 @@ import time
 
 UDP_PORT = 50005
 
-def run_server(stop_event, status_callback=None):
+def run_server(expected_client_ip, stop_event, status_callback=None):
     """
     Função principal do servidor. Escuta o IP na porta especificada 
-    e envia o áudio recebido para os alto-falantes locais.
+    e envia o áudio recebido para os alto-falantes locais,
+    aceitando conexões APENAS do expected_client_ip.
     """
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(("0.0.0.0", UDP_PORT))
@@ -27,6 +28,11 @@ def run_server(stop_event, status_callback=None):
         while not stop_event.is_set():
             try:
                 data, addr = sock.recvfrom(4096)
+                
+                # Ignora pacotes que não vêm do cliente esperado
+                if addr[0] != expected_client_ip:
+                    continue
+
                 if len(data) > 6:
                     rate, channels = struct.unpack('<IH', data[:6])
                     audio_data = data[6:]

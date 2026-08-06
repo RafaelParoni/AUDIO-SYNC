@@ -66,18 +66,22 @@ def get_local_ip():
     except Exception:
         return "127.0.0.1"
 
+def get_data_dir():
+    """Retorna o diretório correto contendo os arquivos de data (ícones etc), funciona no Python puro e PyInstaller."""
+    if hasattr(sys, '_MEIPASS'):
+        return sys._MEIPASS
+    return os.path.dirname(os.path.abspath(__file__))
+
 def create_tray_icon_image():
     """Gera um ícone simples para a bandeja do sistema ou carrega o do usuário"""
-    icon_path = os.path.join(os.path.dirname(get_script_path()), "audioSyncNoText.png")
+    icon_path = os.path.join(get_data_dir(), "audioSyncNoText.png")
     try:
         return Image.open(icon_path)
     except Exception:
-        image = Image.new('RGB', (64, 64), color=(30, 30, 30))
+        image = Image.new('RGB', (64, 64), color=(0, 0, 0))
         d = ImageDraw.Draw(image)
         d.rectangle([16, 16, 48, 48], fill=(0, 200, 0))
         return image
-
-
 
 class AudioSyncApp(ctk.CTk):
     def __init__(self):
@@ -92,10 +96,31 @@ class AudioSyncApp(ctk.CTk):
         self.resizable(False, False)
         
         try:
-            icon_path = os.path.join(os.path.dirname(get_script_path()), "AudioSyncNoText.ico")
-            self.iconbitmap(icon_path)
-        except Exception:
-            pass
+            # Pega o diretório base correto
+            base_dir = get_data_dir()
+            icon_path_png = os.path.join(base_dir, "audioSyncNoText.png")
+            icon_path_ico = os.path.join(base_dir, "AudioSyncNoText.ico")
+            
+            self._icon_img = tk.PhotoImage(file=icon_path_png)
+            
+            def apply_icon():
+                try:
+                    self.iconphoto(True, self._icon_img)
+                    self.wm_iconphoto(True, self._icon_img)
+                except Exception as e:
+                    logging.error(f"Erro photo: {e}")
+                
+                try:
+                    self.iconbitmap(icon_path_ico)
+                    self.wm_iconbitmap(icon_path_ico)
+                except Exception as e:
+                    pass
+                    
+            apply_icon()
+            self.after(200, apply_icon)
+            self.after(500, apply_icon)
+        except Exception as e:
+            logging.error(f"Erro ao carregar icone da janela: {e}")
         
         # Configurações padrão
         self.config = {

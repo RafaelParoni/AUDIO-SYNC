@@ -29,10 +29,9 @@ def run_server(expected_client_ip, stop_event, status_callback=None):
             try:
                 data, addr = sock.recvfrom(4096)
                 
-                # Ignora pacotes que não vêm do cliente esperado
-                if addr[0] != expected_client_ip:
-                    continue
-
+                # Devido ao NAT (Tethering USB), o IP que chega pode ser o do celular e não o do notebook.
+                # Portanto, removemos o bloqueio estrito para não quebrar a conexão.
+                
                 if len(data) > 6:
                     rate, channels = struct.unpack('<IH', data[:6])
                     audio_data = data[6:]

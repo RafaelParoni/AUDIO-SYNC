@@ -2,8 +2,8 @@
 ; Este script empacota o executável gerado em um instalador.
 
 #define MyAppName "AudioSync"
-#define MyAppVersion "1.0"
-#define MyAppPublisher "Seu Nome/Empresa"
+#define MyAppVersion "1.1"
+#define MyAppPublisher "Rafael Paroni - rafaelparoni.vercel.app"
 #define MyAppExeName "AudioSync.exe"
 
 [Setup]
@@ -19,7 +19,8 @@ DefaultGroupName={#MyAppName}
 PrivilegesRequired=lowest
 ; Pasta e nome do arquivo de setup de saída
 OutputDir=SetupOutput
-OutputBaseFilename=AudioSync_Setup_v1.0
+OutputBaseFilename=AudioSync_Setup_v{#MyAppVersion}
+SetupIconFile=AudioSyncNoText.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern

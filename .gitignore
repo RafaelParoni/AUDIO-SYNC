@@ -1,0 +1,14 @@
+# Pastas geradas pelo PyInstaller e Inno Setup
+build/
+dist/
+SetupOutput/
+
+# Arquivos de especificações e temporários
+*.spec
+__pycache__/
+*.pyc
+
+# Ambientes virtuais (caso você crie um no futuro)
+venv/
+env/
+.env/

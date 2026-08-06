@@ -31,8 +31,8 @@ Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortugue
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-; Aponta para o executável que compilamos anteriormente
-Source: "dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+; Copia a pasta inteira gerada pelo PyInstaller (modo onedir) e todos os seus subdiretórios
+Source: "dist\AudioSync\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 ; Cria atalhos no Menu Iniciar e na Área de Trabalho

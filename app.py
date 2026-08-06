@@ -72,6 +72,14 @@ def get_data_dir():
         return sys._MEIPASS
     return os.path.dirname(os.path.abspath(__file__))
 
+# Força o Windows a reconhecer o app como um programa independente (corrige o ícone na barra de tarefas)
+try:
+    import ctypes
+    myappid = 'rafaelparoni.audiosync.launcher.1.1'
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+except Exception:
+    pass
+
 def create_tray_icon_image():
     """Gera um ícone simples para a bandeja do sistema ou carrega o do usuário"""
     icon_path = os.path.join(get_data_dir(), "audioSyncNoText.png")

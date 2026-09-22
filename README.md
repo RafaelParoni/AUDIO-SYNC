@@ -45,19 +45,24 @@ Ambos os sistemas operacionais podem atuar tanto como **Servidor** (quem toca o 
 
 ### 🐧 Instalação no Linux
 
-#### Método Rápido (Script Automatizado)
-O script instala os pacotes necessários do sistema (`python3-tk`, `portaudio`, `pulseaudio-utils`, etc.), configura um ambiente virtual e cria o atalho no menu de aplicativos:
+#### 1. Assistente de Instalação (Setup Wizard)
+Assim como no Windows, você pode rodar o assistente interativo de instalação que configura o diretório de instalação, instala as dependências, cria os atalhos no Menu e na Área de Trabalho e inclui o desinstalador:
 ```bash
 git clone https://github.com/RafaelParoni/AUDIO-SYNC.git
 cd AUDIO-SYNC
-chmod +x install_linux.sh run_linux.sh
-./install_linux.sh
+chmod +x AudioSync_Setup_Linux.sh
+./AudioSync_Setup_Linux.sh
 ```
 
-Depois de instalado, você pode abrir o AudioSync diretamente pelo **Menu de Aplicativos** da sua distro ou pelo terminal com:
+#### 2. Gerar Instaladores (.deb e .sh auto-extraível) para Distribuição
+Para gerar os pacotes prontos de distribuição na pasta `SetupOutput/`:
 ```bash
-./run_linux.sh
+chmod +x build_linux_setup.sh
+./build_linux_setup.sh
 ```
+Isso gerará dentro de `SetupOutput/`:
+- `AudioSync_v1.1_amd64.deb` (Instalador `.deb` para Ubuntu, Debian, Mint)
+- `AudioSync_Setup_v1.1.sh` (Instalador auto-extraível universal para qualquer Linux)
 
 #### Instalação Manual no Linux
 1. Instale as dependências do sistema:
@@ -138,19 +143,24 @@ Both systems can act either as **Server** (receiver/playback) or **Client** (tra
 
 ### 🐧 Linux Installation
 
-#### Quick Automated Setup
-Run the automated installation script to install required packages, create a virtual environment, and add an application shortcut:
+#### 1. Setup Wizard
+Just like on Windows, you can run an interactive installation wizard that configures the installation directory, installs dependencies, creates desktop and menu shortcuts, and includes an uninstaller:
 ```bash
 git clone https://github.com/RafaelParoni/AUDIO-SYNC.git
 cd AUDIO-SYNC
-chmod +x install_linux.sh run_linux.sh
-./install_linux.sh
+chmod +x AudioSync_Setup_Linux.sh
+./AudioSync_Setup_Linux.sh
 ```
 
-Run it either from your application menu (AudioSync) or from terminal:
+#### 2. Building Packages (.deb and standalone .sh) for Distribution
+To generate standalone installer packages in `SetupOutput/`:
 ```bash
-./run_linux.sh
+chmod +x build_linux_setup.sh
+./build_linux_setup.sh
 ```
+This builds inside `SetupOutput/`:
+- `AudioSync_v1.1_amd64.deb` (Debian/Ubuntu/Mint installer package)
+- `AudioSync_Setup_v1.1.sh` (Self-extracting universal installer for any Linux distro)
 
 #### Manual Setup
 1. Install system dependencies:

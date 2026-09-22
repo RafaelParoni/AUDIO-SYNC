@@ -5,8 +5,10 @@ import threading
 import json
 import os
 import sys
-import winreg
+if sys.platform == "win32":
+    import winreg
 import socket
+import subprocess
 
 import pystray
 from PIL import Image, ImageDraw
@@ -72,24 +74,40 @@ def get_data_dir():
         return sys._MEIPASS
     return os.path.dirname(os.path.abspath(__file__))
 
+def get_asset_path(filename):
+    """Localiza o arquivo de asset com resolução case-insensitive para compatibilidade Linux."""
+    base_dir = get_data_dir()
+    path = os.path.join(base_dir, filename)
+    if not os.path.exists(path):
+        try:
+            for f in os.listdir(base_dir):
+                if f.lower() == filename.lower():
+                    return os.path.join(base_dir, f)
+        except Exception:
+            pass
+    return path
+
 # Força o Windows a reconhecer o app como um programa independente (corrige o ícone na barra de tarefas)
-try:
-    import ctypes
-    myappid = 'rafaelparoni.audiosync.launcher.1.1'
-    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-except Exception:
-    pass
+if sys.platform == "win32":
+    try:
+        import ctypes
+        myappid = 'rafaelparoni.audiosync.launcher.1.1'
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    except Exception:
+        pass
 
 def create_tray_icon_image():
     """Gera um ícone simples para a bandeja do sistema ou carrega o do usuário"""
-    icon_path = os.path.join(get_data_dir(), "audioSyncNoText.png")
+    icon_path = get_asset_path("AudioSyncNoText.png")
     try:
-        return Image.open(icon_path)
+        if os.path.exists(icon_path):
+            return Image.open(icon_path)
     except Exception:
-        image = Image.new('RGB', (64, 64), color=(0, 0, 0))
-        d = ImageDraw.Draw(image)
-        d.rectangle([16, 16, 48, 48], fill=(0, 200, 0))
-        return image
+        pass
+    image = Image.new('RGB', (64, 64), color=(0, 0, 0))
+    d = ImageDraw.Draw(image)
+    d.rectangle([16, 16, 48, 48], fill=(0, 200, 0))
+    return image
 
 class AudioSyncApp(ctk.CTk):
     def __init__(self):
@@ -105,28 +123,29 @@ class AudioSyncApp(ctk.CTk):
         
         try:
             # Pega o diretório base correto
-            base_dir = get_data_dir()
-            icon_path_png = os.path.join(base_dir, "audioSyncNoText.png")
-            icon_path_ico = os.path.join(base_dir, "AudioSyncNoText.ico")
+            icon_path_png = get_asset_path("AudioSyncNoText.png")
+            icon_path_ico = get_asset_path("AudioSyncNoText.ico")
             
-            self._icon_img = tk.PhotoImage(file=icon_path_png)
-            
-            def apply_icon():
-                try:
-                    self.iconphoto(True, self._icon_img)
-                    self.wm_iconphoto(True, self._icon_img)
-                except Exception as e:
-                    logging.error(f"Erro photo: {e}")
+            if os.path.exists(icon_path_png):
+                self._icon_img = tk.PhotoImage(file=icon_path_png)
                 
-                try:
-                    self.iconbitmap(icon_path_ico)
-                    self.wm_iconbitmap(icon_path_ico)
-                except Exception as e:
-                    pass
+                def apply_icon():
+                    try:
+                        self.iconphoto(True, self._icon_img)
+                        self.wm_iconphoto(True, self._icon_img)
+                    except Exception as e:
+                        logging.error(f"Erro photo: {e}")
                     
-            apply_icon()
-            self.after(200, apply_icon)
-            self.after(500, apply_icon)
+                    if sys.platform == "win32" and os.path.exists(icon_path_ico):
+                        try:
+                            self.iconbitmap(icon_path_ico)
+                            self.wm_iconbitmap(icon_path_ico)
+                        except Exception:
+                            pass
+                            
+                apply_icon()
+                self.after(200, apply_icon)
+                self.after(500, apply_icon)
         except Exception as e:
             logging.error(f"Erro ao carregar icone da janela: {e}")
         
@@ -181,20 +200,50 @@ class AudioSyncApp(ctk.CTk):
         self.save_config()
 
     def apply_autostart(self, enable):
-        key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
-        try:
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_ALL_ACCESS)
-            if enable:
-                cmd = f'"{get_script_path()}" --autostart'
-                winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, cmd)
-            else:
-                try:
-                    winreg.DeleteValue(key, APP_NAME)
-                except FileNotFoundError:
-                    pass
-            winreg.CloseKey(key)
-        except Exception as e:
-            messagebox.showerror("Erro de Permissão", f"Falha ao configurar inicialização automática:\n{e}")
+        if sys.platform == "win32":
+            key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+            try:
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_ALL_ACCESS)
+                if enable:
+                    cmd = f'"{get_script_path()}" --autostart'
+                    winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, cmd)
+                else:
+                    try:
+                        winreg.DeleteValue(key, APP_NAME)
+                    except FileNotFoundError:
+                        pass
+                winreg.CloseKey(key)
+            except Exception as e:
+                messagebox.showerror("Erro de Permissão", f"Falha ao configurar inicialização automática:\n{e}")
+        else:
+            # Linux XDG Autostart
+            autostart_dir = os.path.expanduser("~/.config/autostart")
+            desktop_file = os.path.join(autostart_dir, "audiosync.desktop")
+            try:
+                if enable:
+                    os.makedirs(autostart_dir, exist_ok=True)
+                    exec_cmd = get_script_path()
+                    if not getattr(sys, 'frozen', False):
+                        exec_cmd = f"{sys.executable} \"{exec_cmd}\""
+                    icon_file = get_asset_path("AudioSyncNoText.png")
+                    content = f"""[Desktop Entry]
+Type=Application
+Version=1.0
+Name=AudioSync
+Comment=Sincronização de Áudio via Rede Local
+Exec={exec_cmd} --autostart
+Icon={icon_file}
+Terminal=false
+Categories=AudioVideo;Audio;
+X-GNOME-Autostart-enabled=true
+"""
+                    with open(desktop_file, "w") as f:
+                        f.write(content)
+                else:
+                    if os.path.exists(desktop_file):
+                        os.remove(desktop_file)
+            except Exception as e:
+                messagebox.showerror("Erro de Permissão", f"Falha ao configurar inicialização automática no Linux:\n{e}")
 
     def setup_ui(self):
         # Gradiente Baseado no seu Portfólio: #5DE0E6 -> #004AAD
@@ -264,7 +313,8 @@ class AudioSyncApp(ctk.CTk):
         
         # Checkboxes de automação
         self.autostart_var = tk.BooleanVar(value=self.config.get("autostart", False))
-        ctk.CTkCheckBox(self.main_frame, text="Iniciar oculto com o Windows", 
+        autostart_label = "Iniciar oculto com o Windows" if sys.platform == "win32" else "Iniciar oculto com o Sistema"
+        ctk.CTkCheckBox(self.main_frame, text=autostart_label, 
                         variable=self.autostart_var, command=self.toggle_autostart,
                         fg_color="#004AAD").pack(anchor="w", pady=(15, 5))
                        
@@ -355,10 +405,14 @@ class AudioSyncApp(ctk.CTk):
         self.log_win.protocol("WM_DELETE_WINDOW", on_close)
 
     def open_log_folder(self):
-        import os
         log_path = os.path.abspath('.')
         try:
-            os.startfile(log_path)
+            if sys.platform == 'win32':
+                os.startfile(log_path)
+            elif sys.platform == 'darwin':
+                subprocess.Popen(['open', log_path])
+            else:
+                subprocess.Popen(['xdg-open', log_path])
         except Exception as e:
             messagebox.showerror("Erro", f"Não foi possível abrir a pasta: {e}")
             
@@ -450,12 +504,16 @@ class AudioSyncApp(ctk.CTk):
         self.ip_entry.configure(state="normal")
 
     def setup_tray(self):
-        menu = pystray.Menu(
-            pystray.MenuItem('Abrir AudioSync', self.show_window),
-            pystray.MenuItem('Sair Completamente', self.quit_app)
-        )
-        self.tray_icon = pystray.Icon("AudioSync", create_tray_icon_image(), "AudioSync", menu)
-        threading.Thread(target=self.tray_icon.run, daemon=True).start()
+        try:
+            menu = pystray.Menu(
+                pystray.MenuItem('Abrir AudioSync', self.show_window),
+                pystray.MenuItem('Sair Completamente', self.quit_app)
+            )
+            self.tray_icon = pystray.Icon("AudioSync", create_tray_icon_image(), "AudioSync", menu)
+            threading.Thread(target=self.tray_icon.run, daemon=True).start()
+        except Exception as e:
+            logging.warning(f"Bandeja do sistema não disponível: {e}")
+            self.tray_icon = None
 
     def hide_window(self):
         self.withdraw()
@@ -467,7 +525,10 @@ class AudioSyncApp(ctk.CTk):
         logging.info("Encerrando o aplicativo pelo usuário...")
         self.stop_event.set()
         if self.tray_icon:
-            self.tray_icon.stop()
+            try:
+                self.tray_icon.stop()
+            except Exception:
+                pass
         self.quit()
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
-    datas=[('audioSyncNoText.png', '.'), ('AudioSyncNoText.ico', '.')],
+    datas=[('AudioSyncNoText.png', '.'), ('AudioSyncNoText.ico', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

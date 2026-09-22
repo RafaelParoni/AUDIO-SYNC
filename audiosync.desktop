@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=AudioSync
+GenericName=Audio Mirroring Tool
+Comment=Sincronização de Áudio via Rede Local (UDP)
+Exec=python3 app.py
+Icon=AudioSyncNoText
+Terminal=false
+Categories=AudioVideo;Audio;Network;
+Keywords=audio;sync;stream;udp;
+StartupNotify=true

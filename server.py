@@ -1,6 +1,9 @@
 import socket
 import struct
-import pyaudiowpatch as pyaudio
+try:
+    import pyaudiowpatch as pyaudio
+except ImportError:
+    import pyaudio
 import time
 
 UDP_PORT = 50005

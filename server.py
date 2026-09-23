@@ -15,6 +15,10 @@ def run_server(expected_client_ip, stop_event, status_callback=None):
     aceitando conexões APENAS do expected_client_ip.
     """
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 262144)
+    except Exception:
+        pass
     sock.bind(("0.0.0.0", UDP_PORT))
     # Timeout curto para permitir verificar o stop_event frequentemente
     sock.settimeout(0.5)
@@ -41,8 +45,11 @@ def run_server(expected_client_ip, stop_event, status_callback=None):
                     
                     if stream is None or rate != current_rate or channels != current_channels:
                         if stream is not None:
-                            stream.stop_stream()
-                            stream.close()
+                            try:
+                                stream.stop_stream()
+                                stream.close()
+                            except Exception:
+                                pass
                         
                         if status_callback:
                             status_callback(f"Recebendo de {addr[0]} ({rate}Hz, {channels} canais)")
@@ -54,7 +61,10 @@ def run_server(expected_client_ip, stop_event, status_callback=None):
                         current_rate = rate
                         current_channels = channels
                     
-                    stream.write(audio_data)
+                    try:
+                        stream.write(audio_data, exception_on_underflow=False)
+                    except TypeError:
+                        stream.write(audio_data)
             except socket.timeout:
                 continue
             except Exception as e:
